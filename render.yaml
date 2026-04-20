@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: project-yggdrasil
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
