@@ -96,20 +96,21 @@ function Architecture() {
 function Projects({ fillers, density, onPick }) {
   const store = window.YGG_STORE.useStore();
   const projects = store.projects;
-  const canEdit = !!store.session;
+  const canEdit = true; // auth deferred
 
   const shown = [...projects];
   const fillerCount = Math.max(0, density - projects.length);
   for (let i = 0; i < fillerCount && i < fillers.length; i++) shown.push({ ...fillers[i], _ghost: true });
 
-  const addBlank = () => {
-    const p = store.addProject({
-      name: 'New branch',
-      tagline: 'click fields to edit',
-      status: 'plan',
-    });
-    // open overlay for the new one
-    setTimeout(() => onPick(p.code), 40);
+  const addBlank = async () => {
+    try {
+      const p = await store.addProject({
+        name: 'New branch',
+        tagline: 'click fields to edit',
+        status: 'plan',
+      });
+      if (p?.code) onPick(p.code);
+    } catch (e) { console.error(e); }
   };
 
   return (
@@ -143,7 +144,7 @@ function Projects({ fillers, density, onPick }) {
 
 function ProjectCard({ p, onClick, store }) {
   const { EditableText, EditableStatus } = window.YGG_EDIT;
-  const canEdit = !!store.session;
+  const canEdit = true; // auth deferred
   const progress = window.YGG_STORE.deriveProgress(p);
 
   return (

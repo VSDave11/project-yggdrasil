@@ -1,7 +1,7 @@
 // App root — store + auth + hero + sections + overlay
 const { useEffect, useState } = React;
 
-function Hero({ fillers, density, onPick }) {
+function Hero({ fillers, density, onPick, onCreate }) {
   const { projects } = window.YGG_STORE.useStore();
   return (
     <section id="top" className="hero">
@@ -16,7 +16,7 @@ function Hero({ fillers, density, onPick }) {
       </div>
       <div className="hero-stage">
         <div className="tree-wrap">
-          <YggTree projects={projects} fillers={fillers} density={density} onPick={onPick} />
+          <YggTree projects={projects} fillers={fillers} density={density} onPick={onPick} onCreate={onCreate} />
         </div>
       </div>
       <div className="hero-foot">
@@ -57,6 +57,7 @@ function AppInner() {
   const [tweaksActive, setTweaksActive] = useState(false);
   const [pickedCode, setPickedCode] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [newBranchOpen, setNewBranchOpen] = useState(false);
 
   const { FILLERS } = window.YGG_DATA;
   const { projects } = window.YGG_STORE.useStore();
@@ -88,11 +89,14 @@ function AppInner() {
   };
 
   const { AuthModal } = window.YGG_AUTH;
+  const { NewBranchModal } = window.YGG_NEWBRANCH;
 
   return (
     <>
       <Nav onSignInClick={() => setAuthOpen(true)} />
-      <Hero fillers={FILLERS} density={tweaks.density} onPick={onPickFromTree} />
+      <Hero fillers={FILLERS} density={tweaks.density}
+            onPick={onPickFromTree}
+            onCreate={() => setNewBranchOpen(true)} />
       <hr className="rule" />
       <Manifesto />
       <hr className="rule" />
@@ -115,6 +119,11 @@ function AppInner() {
       <Overlay projectCode={pickedCode} onClose={() => setPickedCode(null)} />
       <Tweaks tweaks={tweaks} setTweaks={setTweaks} active={tweaksActive} onClose={() => setTweaksActive(false)} />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <NewBranchModal
+        open={newBranchOpen}
+        onClose={() => setNewBranchOpen(false)}
+        onCreated={(p) => p?.code && setPickedCode(p.code)}
+      />
     </>);
 
 }

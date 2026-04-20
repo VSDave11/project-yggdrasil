@@ -1,8 +1,21 @@
 // Radial tree hero. Core in the middle, branches reaching to named projects.
-// Animated growth on mount + idle pulse.
+// Animated growth on mount + idle pulse + floating `?` phantom branches
+// that the user can click to create a new project.
 const { useEffect, useMemo, useRef, useState } = React;
 
-function YggTree({ projects, fillers, density, onPick }) {
+// Positions for the floating phantom branches, relative to core (cx, cy).
+// Arranged in an arc above & around the core so they don't overlap the
+// downward-fanning real branches.
+const PHANTOM_OFFSETS = [
+  { dx: -430, dy: -40  },
+  { dx: -270, dy: -135 },
+  { dx:  -90, dy: -160 },
+  { dx:   90, dy: -160 },
+  { dx:  270, dy: -135 },
+  { dx:  430, dy: -40  },
+];
+
+function YggTree({ projects, fillers, density, onPick, onCreate }) {
   // Combine real projects with fillers up to density
   const nodes = useMemo(() => {
     const all = [
@@ -19,14 +32,13 @@ function YggTree({ projects, fillers, density, onPick }) {
   const W = 1280, H = 780;
   const cx = W / 2, cy = H * 0.22;
 
-  // All branches fan DOWNWARD from core, filling the space below the title.
+  // All branches fan DOWNWARD from core.
   const positions = useMemo(() => {
     return nodes.map((_, i) => {
-      const span = Math.PI * 1.05; // ~190deg across the bottom
+      const span = Math.PI * 1.05;
       const start = -Math.PI / 2 - span / 2 + Math.PI;
       const t = N === 1 ? 0.5 : i / (N - 1);
       const a = start + t * span;
-      // Much bigger ellipse — fill the vertical space under the title
       const rx = 600, ry = 560;
       return {
         x: cx + Math.cos(a) * rx,
@@ -42,15 +54,26 @@ function YggTree({ projects, fillers, density, onPick }) {
     return () => cancelAnimationFrame(id);
   }, []);
 
-  // Branch path: smooth curve from core to node
   const branchPath = (p) => {
     const mx = cx + (p.x - cx) * 0.35;
     const my = cy + (p.y - cy) * 0.55;
     return `M ${cx} ${cy} Q ${mx} ${my} ${p.x} ${p.y}`;
   };
 
-  // No roots — core sits near the top, branches fan down beneath it.
+  // Phantom branch paths (from core up to each phantom)
+  const phantomPaths = PHANTOM_OFFSETS.map(o => {
+    const px = cx + o.dx, py = cy + o.dy;
+    const mx = cx + o.dx * 0.4;
+    const my = cy + o.dy * 0.55;
+    return { px, py, d: `M ${cx} ${cy} Q ${mx} ${my} ${px} ${py}` };
+  });
+
   const roots = [];
+
+  const handleCreate = (e) => {
+    e && e.stopPropagation();
+    if (typeof onCreate === 'function') onCreate();
+  };
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
@@ -64,7 +87,7 @@ function YggTree({ projects, fillers, density, onPick }) {
           <feGaussianBlur stdDeviation="4" />
         </filter>
 
-        {/* ─── LIQUID GLASS DEFS (used in CSS by url() refs) ─── */}
+        {/* LIQUID GLASS DEFS (used in CSS by url() refs) */}
         <radialGradient id="liquidNodeGrad" cx="35%" cy="30%" r="70%">
           <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.9" />
           <stop offset="30%"  stopColor="var(--accent)" stopOpacity="0.6" />
@@ -77,7 +100,7 @@ function YggTree({ projects, fillers, density, onPick }) {
         </radialGradient>
       </defs>
 
-      {/* ambient ring */}
+      {/* ambient rings */}
       <g opacity={mounted ? 1 : 0} style={{ transition: "opacity 1.2s ease" }}>
         <circle cx={cx} cy={cy} r="380" fill="none" stroke="var(--rule)" strokeDasharray="1 6" />
         <circle cx={cx} cy={cy} r="260" fill="none" stroke="var(--rule)" strokeDasharray="1 4" opacity="0.6" />
@@ -87,6 +110,30 @@ function YggTree({ projects, fillers, density, onPick }) {
       <circle cx={cx} cy={cy} r="180" fill="url(#core-glow)">
         <animate attributeName="r" values="160;200;160" dur="6s" repeatCount="indefinite" />
       </circle>
+
+      {/* ── PHANTOM BRANCHES (floating ?) ── */}
+      <g className="phantom-layer" opacity={mounted ? 1 : 0} style={{ transition: "opacity 1.4s ease 0.8s" }}>
+        {phantomPaths.map((ph, i) => (
+          <g key={`ph-${i}`} className="phantom-wrap" style={{ '--i': i }}>
+            <path
+              d={ph.d}
+              className="phantom-branch"
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth="0.7"
+              strokeLinecap="round"
+              strokeDasharray="2 5"
+            />
+            <g className="phantom" onClick={handleCreate}
+               role="button" tabIndex={0}
+               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleCreate(e)}>
+              <circle cx={ph.px} cy={ph.py} r="11" className="phantom-halo" fill="var(--accent)" />
+              <circle cx={ph.px} cy={ph.py} r="9"  className="phantom-circle" />
+              <text x={ph.px} y={ph.py + 3.2} textAnchor="middle" className="phantom-q">?</text>
+            </g>
+          </g>
+        ))}
+      </g>
 
       {/* roots (decorative) */}
       <g stroke="var(--rule)" strokeWidth="0.8" fill="none">
@@ -116,7 +163,6 @@ function YggTree({ projects, fillers, density, onPick }) {
                   transition: `stroke-dashoffset 1.5s cubic-bezier(.2,.8,.2,1) ${delay}s`,
                 }}
               />
-              {/* subtle glow trace */}
               <path
                 d={d}
                 stroke="var(--accent)"

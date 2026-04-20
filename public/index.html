@@ -1605,6 +1605,190 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   border: 1px solid var(--glass-stroke);
   border-radius: 18px;
 }
+
+/* ═════════════════ PHANTOM BRANCHES (floating ?) ═════════════════ */
+.phantom-layer { pointer-events: auto; }
+.phantom-wrap {
+  animation: ygg-phantom-drift 9s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -1.6s);
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+@keyframes ygg-phantom-drift {
+  0%, 100% { transform: translate(0px, 0px); }
+  50%      { transform: translate(0px, -7px); }
+}
+.phantom-branch {
+  opacity: 0.35;
+  animation: ygg-phantom-pulse 4s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -0.7s);
+}
+@keyframes ygg-phantom-pulse {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 0.6;  }
+}
+.phantom {
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity .2s ease;
+}
+.phantom:focus { outline: none; }
+.phantom:hover { opacity: 1; }
+.phantom-circle {
+  fill: var(--bg-2);
+  stroke: var(--accent);
+  stroke-opacity: 0.55;
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  transition: stroke-opacity .2s ease, filter .25s ease, stroke-dasharray .2s ease;
+}
+.phantom:hover .phantom-circle {
+  stroke-opacity: 1;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 10px var(--accent-glow));
+}
+.phantom-halo {
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.phantom:hover .phantom-halo {
+  opacity: 0.18;
+}
+.phantom-q {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  fill: var(--ink-dim);
+  pointer-events: none;
+  transition: fill .2s ease;
+}
+.phantom:hover .phantom-q { fill: var(--accent); }
+
+/* ═════════════════ NEW BRANCH MODAL ═════════════════ */
+.nb-scrim {
+  position: fixed; inset: 0;
+  background: color-mix(in oklab, var(--bg) 75%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: grid; place-items: center;
+  z-index: 100;
+  animation: nb-fade .2s ease;
+}
+@keyframes nb-fade { from { opacity: 0; } to { opacity: 1; } }
+.nb-card {
+  width: min(480px, 92vw);
+  background: var(--bg-2);
+  border: 1px solid var(--rule);
+  border-radius: 18px;
+  padding: 30px 32px;
+  box-shadow:
+    0 30px 80px -30px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  animation: nb-rise .28s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes nb-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+[data-surface="liquid"] .nb-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg));
+  border: 1px solid var(--glass-stroke);
+}
+.nb-eyebrow {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.nb-title {
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.1;
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+.nb-title em { font-style: italic; color: var(--accent); }
+.nb-sub {
+  color: var(--ink-dim);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 22px;
+}
+.nb-field { display: block; margin-bottom: 14px; }
+.nb-row { display: flex; gap: 12px; }
+.nb-row .nb-field { margin-bottom: 14px; }
+.nb-label {
+  display: block;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 6px;
+}
+.nb-input {
+  width: 100%;
+  background: color-mix(in oklab, var(--bg) 80%, var(--bg-2));
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: var(--f-body);
+  font-size: 14px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.nb-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.nb-err {
+  background: color-mix(in oklab, var(--danger) 15%, transparent);
+  border: 1px solid color-mix(in oklab, var(--danger) 40%, transparent);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+.nb-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.nb-btn {
+  font-family: var(--f-body);
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all .15s ease;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+}
+.nb-btn.ghost:hover {
+  border-color: var(--ink-dim);
+  color: var(--ink);
+}
+.nb-btn.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 500;
+}
+.nb-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 20px -8px var(--accent-glow);
+}
+.nb-btn:disabled { opacity: 0.5; cursor: wait; }
 </style>
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
@@ -1631,6 +1815,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 <script type="text/babel" src="src/sections.jsx"></script>
 <script type="text/babel" src="src/overlay.jsx"></script>
 <script type="text/babel" src="src/tweaks.jsx"></script>
+<script type="text/babel" src="src/newbranch.jsx"></script>
 <script type="text/babel" src="src/app.jsx"></script>
 </body>
 </html>

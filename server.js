@@ -1,20 +1,22 @@
 const express = require('express');
 const cors = require('cors');
+const SEED = require('./seed-data');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Supabase config ──
+// Anon key is safe to hardcode as a fallback — it only gives access the RLS
+// policies allow. In prod, set SUPABASE_KEY via Render env to make rotation easy.
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tyjdelvkwqdzwinevrbo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5amRlbHZrd3FkendpbmV2cmJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDAxNzYsImV4cCI6MjA5MTM3NjE3Nn0.IfgVfmJL86Tyzg2qTLTbWYTJMfoi9m9xBNwJ2FZdit4';
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static('public'));
 app.use('/src', express.static('src'));
 
 // ── Supabase REST helper ──
-async function supabase(path, options = {}) {
+async function sb(path, options = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   const res = await fetch(url, {
     ...options,
@@ -23,56 +25,29 @@ async function supabase(path, options = {}) {
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
       'Prefer': options.prefer || 'return=representation',
-      ...options.headers
-    }
+      ...options.headers,
+    },
   });
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Supabase error: ${res.status} ${err}`);
+    const body = await res.text();
+    throw new Error(`Supabase ${res.status}: ${body}`);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
 
-// ── Map DB row to frontend format ──
-function mapRow(row) {
-  return {
-    id: row.id,
-    name: row.name,
-    icon: row.icon,
-    color: row.color,
-    tag: row.tag,
-    desc: row.description,
-    progress: row.progress,
-    users: row.users,
-    team: row.team || ['Unassigned'],
-    log: row.log || [],
-    subprojects: row.subprojects || []
-  };
-}
+// Row <-> frontend project shape
+const rowToProject = (row) => ({ ...(row.data || {}), code: row.code, _id: row.id });
+const projectToRow = (p) => {
+  const { code, _id, ...data } = p;
+  return { code, data };
+};
 
-// ── Map frontend format to DB row ──
-function mapToRow(p) {
-  const row = {};
-  if (p.name !== undefined) row.name = p.name;
-  if (p.icon !== undefined) row.icon = p.icon;
-  if (p.color !== undefined) row.color = p.color;
-  if (p.tag !== undefined) row.tag = p.tag;
-  if (p.desc !== undefined) row.description = p.desc;
-  if (p.progress !== undefined) row.progress = p.progress;
-  if (p.users !== undefined) row.users = p.users;
-  if (p.team !== undefined) row.team = p.team;
-  if (p.log !== undefined) row.log = p.log;
-  if (p.subprojects !== undefined) row.subprojects = p.subprojects;
-  return row;
-}
-
-// ── SSE (Server-Sent Events) for real-time sync ──
+// ── SSE ──
 const clients = new Set();
-
 function broadcast(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  clients.forEach(res => res.write(msg));
+  for (const c of clients) { try { c.write(msg); } catch {} }
 }
 
 app.get('/api/events', async (req, res) => {
@@ -80,225 +55,183 @@ app.get('/api/events', async (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
+    'Access-Control-Allow-Origin': '*',
   });
-
-  // Send current state
+  // Prime the connection so proxies don't buffer.
+  res.write(': connected\n\n');
   try {
-    const rows = await supabase('projects?order=id.asc');
-    const projects = rows.map(mapRow);
-    res.write(`event: init\ndata: ${JSON.stringify(projects)}\n\n`);
-  } catch(e) {
-    console.error('SSE init error:', e);
+    const rows = await sb('projects?order=id.asc');
+    res.write(`event: init\ndata: ${JSON.stringify((rows || []).map(rowToProject))}\n\n`);
+  } catch (e) {
+    console.error('SSE init error:', e.message);
     res.write(`event: init\ndata: []\n\n`);
   }
-
   clients.add(res);
-  console.log(`Client connected (${clients.size} total)`);
-
+  console.log(`SSE client connected (${clients.size} total)`);
+  const keepalive = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
   req.on('close', () => {
+    clearInterval(keepalive);
     clients.delete(res);
-    console.log(`Client disconnected (${clients.size} total)`);
+    console.log(`SSE client disconnected (${clients.size} total)`);
   });
 });
 
-// ── REST API ──
-
-// Get all projects
+// ── REST ──
 app.get('/api/projects', async (req, res) => {
   try {
-    const rows = await supabase('projects?order=id.asc');
-    res.json(rows.map(mapRow));
-  } catch(e) {
-    console.error('GET projects error:', e);
+    const rows = await sb('projects?order=id.asc');
+    res.json((rows || []).map(rowToProject));
+  } catch (e) {
+    console.error('GET /api/projects', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── Activity Log ──
-async function logActivity(action, project_name, user_name, detail) {
+app.post('/api/projects', async (req, res) => {
   try {
-    await supabase('activity_log', {
-      method: 'POST',
-      body: JSON.stringify({ action, project_name: project_name || '', user_name: user_name || 'Someone', detail: detail || '' }),
-      prefer: 'return=minimal'
+    const p = req.body || {};
+    if (!p.code) p.code = `YGG-${Date.now().toString(36).slice(-5).toUpperCase()}`;
+    if (!p.name) p.name = 'New branch';
+    if (!p.changelog) {
+      p.changelog = [{ date: monthYear(), text: 'Project created' }];
+    }
+    const row = projectToRow(p);
+    const inserted = await sb('projects', { method: 'POST', body: JSON.stringify(row) });
+    const project = rowToProject(inserted[0]);
+    broadcast('project-added', project);
+    await logActivity('created', project.code, project.name, req.headers['x-user-name'], `New branch "${project.name}" added`);
+    res.status(201).json(project);
+  } catch (e) {
+    console.error('POST /api/projects', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/projects/:code', async (req, res) => {
+  try {
+    const code = req.params.code;
+    const incoming = req.body || {};
+    // read current
+    const existingRows = await sb(`projects?code=eq.${encodeURIComponent(code)}`);
+    if (!existingRows || !existingRows[0]) return res.status(404).json({ error: 'Not found' });
+    const current = rowToProject(existingRows[0]);
+    const merged = { ...current, ...incoming, code }; // code is immutable via this route
+    const { code: _c, _id: _id, ...data } = merged;
+    const updated = await sb(`projects?code=eq.${encodeURIComponent(code)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ data, updated_at: new Date().toISOString() }),
     });
-  } catch(e) { console.error('Activity log error:', e); }
+    const project = rowToProject(updated[0]);
+    broadcast('project-updated', project);
+
+    const details = diffSummary(current, merged);
+    const userName = req.headers['x-user-name'] || 'Someone';
+    for (const d of details) {
+      await logActivity('updated', project.code, project.name, userName, d);
+    }
+    res.json(project);
+  } catch (e) {
+    console.error('PUT /api/projects/:code', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/projects/:code', async (req, res) => {
+  try {
+    const code = req.params.code;
+    let name = code;
+    try {
+      const existing = await sb(`projects?code=eq.${encodeURIComponent(code)}`);
+      if (existing && existing[0]) name = existing[0].data?.name || code;
+    } catch {}
+    await sb(`projects?code=eq.${encodeURIComponent(code)}`, { method: 'DELETE', prefer: 'return=minimal' });
+    broadcast('project-deleted', { code });
+    await logActivity('deleted', code, name, req.headers['x-user-name'], `Branch "${name}" removed`);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/projects/:code', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Activity log ──
+async function logActivity(action, project_code, project_name, user_name, detail) {
+  try {
+    const payload = {
+      action,
+      project_code: project_code || '',
+      project_name: project_name || '',
+      user_name: user_name || 'Someone',
+      detail: detail || '',
+    };
+    await sb('activity_log', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      prefer: 'return=minimal',
+    });
+    broadcast('activity', { ...payload, created_at: new Date().toISOString() });
+  } catch (e) {
+    console.error('logActivity', e.message);
+  }
 }
 
-// Get recent activity
 app.get('/api/activity', async (req, res) => {
   try {
-    const rows = await supabase('activity_log?order=created_at.desc&limit=30');
-    res.json(rows);
-  } catch(e) {
-    console.error('GET activity error:', e);
+    const rows = await sb('activity_log?order=created_at.desc&limit=30');
+    res.json(rows || []);
+  } catch (e) {
+    console.error('GET /api/activity', e.message);
     res.json([]);
   }
 });
 
-// Add a project
-app.post('/api/projects', async (req, res) => {
-  try {
-    const { name, icon, color, tag, desc, team, subprojects } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name is required' });
+// ── Helpers ──
+function monthYear() {
+  return new Date().toLocaleDateString('en', { month: 'short', year: 'numeric' });
+}
 
-    const row = {
-      name: name || 'Untitled',
-      icon: icon || '🌱',
-      color: color || 'green',
-      tag: tag || 'Concept',
-      description: desc || 'A new branch of Yggdrasil.',
-      progress: 0,
-      users: '—',
-      team: team || ['Unassigned'],
-      log: [{ date: new Date().toLocaleDateString('en', { month: 'short', year: 'numeric' }), text: 'Project created' }],
-      subprojects: subprojects || []
-    };
-
-    const rows = await supabase('projects', {
-      method: 'POST',
-      body: JSON.stringify(row)
-    });
-
-    const project = mapRow(rows[0]);
-    const userName = req.headers['x-user-name'] || (team && team[0]) || 'Someone';
-    await logActivity('created', name, userName, `New project "${name}" added`);
-    broadcast('project-added', project);
-    broadcast('activity', { action: 'created', project_name: name, user_name: userName, detail: `New project "${name}" added`, created_at: new Date().toISOString() });
-    res.status(201).json(project);
-  } catch(e) {
-    console.error('POST project error:', e);
-    res.status(500).json({ error: e.message });
+function diffSummary(oldP, newP) {
+  const out = [];
+  const simpleFields = ['name', 'suffix', 'tagline', 'status', 'owners', 'since', 'stack', 'description'];
+  for (const f of simpleFields) {
+    if (oldP[f] !== newP[f] && newP[f] !== undefined) {
+      out.push(`${f} updated`);
+    }
   }
-});
-
-// Delete a project
-app.delete('/api/projects/:id', async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    // Get name before deleting
-    let projectName = 'Unknown';
-    try {
-      const existing = await supabase(`projects?id=eq.${id}`);
-      if (existing && existing[0]) projectName = existing[0].name;
-    } catch(e) {}
-
-    await supabase(`projects?id=eq.${id}`, { method: 'DELETE' });
-    const userName = req.headers['x-user-name'] || 'Someone';
-    await logActivity('deleted', projectName, userName, `Project "${projectName}" removed`);
-    broadcast('project-deleted', { id });
-    broadcast('activity', { action: 'deleted', project_name: projectName, user_name: userName, detail: `Project "${projectName}" removed`, created_at: new Date().toISOString() });
-    res.json({ success: true });
-  } catch(e) {
-    console.error('DELETE project error:', e);
-    res.status(500).json({ error: e.message });
+  if (JSON.stringify(oldP.metrics || []) !== JSON.stringify(newP.metrics || [])) out.push('Metrics updated');
+  if (JSON.stringify(oldP.features || []) !== JSON.stringify(newP.features || [])) out.push('Features updated');
+  const oldSubs = oldP.subprojects || [];
+  const newSubs = newP.subprojects || [];
+  if (newSubs.length > oldSubs.length) out.push(`Added sub-project`);
+  else if (newSubs.length < oldSubs.length) out.push(`Removed a sub-project`);
+  else if (JSON.stringify(oldSubs) !== JSON.stringify(newSubs)) out.push('Sub-projects updated');
+  const oldLog = oldP.changelog || [];
+  const newLog = newP.changelog || [];
+  if (newLog.length > oldLog.length) {
+    const newest = newLog[0];
+    if (newest?.text) out.push(`Changelog: "${newest.text}"`);
   }
-});
+  if (!out.length) out.push('Updated');
+  return out;
+}
 
-// Update a project
-app.put('/api/projects/:id', async (req, res) => {
+// ── Auto-seed on startup if DB is empty ──
+async function autoSeed() {
+  if (!SUPABASE_KEY) return;
   try {
-    const id = parseInt(req.params.id);
-
-    // Get old values for comparison
-    let oldProject = null;
-    try {
-      const existing = await supabase(`projects?id=eq.${id}`);
-      if (existing && existing[0]) oldProject = existing[0];
-    } catch(e) {}
-
-    const row = mapToRow(req.body);
-
-    const rows = await supabase(`projects?id=eq.${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(row)
-    });
-
-    const project = mapRow(rows[0]);
-    const userName = req.headers['x-user-name'] || 'Someone';
-
-    // Build detailed change list
-    const details = [];
-    const b = req.body;
-    const o = oldProject || {};
-
-    if (b.name !== undefined && b.name !== o.name) details.push(`Renamed to "${b.name}"`);
-    if (b.icon !== undefined && b.icon !== o.icon) details.push(`Icon changed`);
-    if (b.color !== undefined && b.color !== o.color) details.push(`Color → ${b.color}`);
-    if (b.tag !== undefined && b.tag !== o.tag) details.push(`Status → "${b.tag}"`);
-    if (b.desc !== undefined && b.desc !== o.description) details.push(`Description updated`);
-    if (b.progress !== undefined && b.progress !== o.progress) details.push(`Progress ${o.progress||0}% → ${b.progress}%`);
-    if (b.users !== undefined && b.users !== o.users) details.push(`Users → ${b.users}`);
-
-    if (b.team) {
-      const oldTeam = o.team || [];
-      const newTeam = b.team || [];
-      const added = newTeam.filter(t => !oldTeam.includes(t));
-      const removed = oldTeam.filter(t => !newTeam.includes(t));
-      if (added.length) details.push(`Added team: ${added.join(', ')}`);
-      if (removed.length) details.push(`Removed team: ${removed.join(', ')}`);
-      if (!added.length && !removed.length && JSON.stringify(oldTeam) !== JSON.stringify(newTeam)) details.push('Team updated');
-    }
-
-    if (b.log) {
-      const oldLog = o.log || [];
-      const newLog = b.log || [];
-      if (newLog.length > oldLog.length) {
-        const newest = newLog[0];
-        details.push(`Changelog: "${newest.text}"${newest.author ? ' by ' + newest.author : ''}`);
-      }
-    }
-
-    if (b.subprojects) {
-      const oldSubs = o.subprojects || [];
-      const newSubs = b.subprojects || [];
-      if (newSubs.length > oldSubs.length) {
-        const newest = newSubs[newSubs.length - 1];
-        details.push(`Added sub-project "${newest.name}"`);
-      } else if (newSubs.length < oldSubs.length) {
-        details.push(`Removed a sub-project`);
-      } else {
-        // Find which sub changed
-        for (let i = 0; i < newSubs.length; i++) {
-          if (JSON.stringify(newSubs[i]) !== JSON.stringify(oldSubs[i])) {
-            const s = newSubs[i];
-            const os = oldSubs[i] || {};
-            const subChanges = [];
-            if (s.name !== os.name) subChanges.push(`name → "${s.name}"`);
-            if (s.progress !== os.progress) subChanges.push(`${os.progress||0}% → ${s.progress}%`);
-            if (s.owner !== os.owner) subChanges.push(`owner → ${s.owner}`);
-            if (s.icon !== os.icon) subChanges.push(`icon changed`);
-            if (s.desc !== os.desc) subChanges.push(`desc updated`);
-            if (subChanges.length) {
-              details.push(`Sub "${s.name}": ${subChanges.join(', ')}`);
-            } else {
-              details.push(`Sub "${s.name}" updated`);
-            }
-            break;
-          }
-        }
-      }
-    }
-
-    if (!details.length) details.push('Updated');
-
-    // Log each change as separate activity entry
-    for (const detail of details) {
-      await logActivity('updated', project.name, userName, detail);
-      broadcast('activity', { action: 'updated', project_name: project.name, user_name: userName, detail, created_at: new Date().toISOString() });
-    }
-
-    broadcast('project-updated', project);
-    res.json(project);
-  } catch(e) {
-    console.error('PUT project error:', e);
-    res.status(500).json({ error: e.message });
+    const rows = await sb('projects?select=id&limit=1');
+    if (rows && rows.length) return;
+    console.log('🌱 Empty projects table → seeding defaults');
+    const payload = SEED.map(p => ({ code: p.code, data: (() => { const { code, ...rest } = p; return rest; })() }));
+    await sb('projects', { method: 'POST', body: JSON.stringify(payload), prefer: 'return=minimal' });
+    console.log(`🌱 Seeded ${payload.length} projects`);
+  } catch (e) {
+    console.error('autoSeed', e.message);
   }
-});
+}
 
-// ── Start server ──
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🌳 Yggdrasil server running on port ${PORT}`);
   console.log(`   Supabase: ${SUPABASE_URL}`);
+  await autoSeed();
 });

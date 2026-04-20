@@ -2,8 +2,8 @@
 const { useState: __useState, useEffect: __useEffect, useRef: __useRef } = React;
 
 function useCanEdit() {
-  const { session } = window.YGG_STORE.useStore();
-  return !!session;
+  // Auth is deferred — everyone can edit until Google OAuth is wired up.
+  return true;
 }
 
 // Simple text (single line)

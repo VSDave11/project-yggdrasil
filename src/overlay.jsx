@@ -27,7 +27,7 @@ function Overlay({ projectCode, onClose }) {
 
   if (!project) return null;
 
-  const canEdit = !!store.session;
+  const canEdit = true; // auth deferred
   const { EditableText, EditableTextarea, EditableStatus, EditableProgress } = window.YGG_EDIT;
   const p = project;
 
