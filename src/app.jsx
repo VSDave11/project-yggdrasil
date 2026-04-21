@@ -103,7 +103,6 @@ function AppInner() {
       <Architecture />
       <hr className="rule" />
       <Projects fillers={FILLERS} density={tweaks.density} onPick={(code) => setPickedCode(code)} />
-      <Telemetry />
       <Timeline />
       <hr className="rule" />
       <Activity />

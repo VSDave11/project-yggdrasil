@@ -151,13 +151,54 @@ function Overlay({ projectCode, onClose }) {
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 20 }}>
-            {p.metrics.map((m, i) => (
-              <div key={i}>
-                <div style={{ fontFamily: 'var(--f-display)', fontWeight: 300, fontSize: 48, letterSpacing: '-0.02em', lineHeight: 1 }}>{m.k}</div>
-                <div className="mono" style={{ marginTop: 6, textTransform: 'uppercase' }}>{m.l}</div>
+            {(p.metrics || []).map((m, i) => (
+              <div key={i} className="ov-metric">
+                <div style={{ fontFamily: 'var(--f-display)', fontWeight: 300, fontSize: 48, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  <EditableText
+                    value={m.k}
+                    onCommit={(v) => {
+                      const metrics = (p.metrics || []).slice();
+                      metrics[i] = { ...metrics[i], k: v };
+                      store.updateProject(p.code, { metrics });
+                    }}
+                    placeholder="value"
+                  />
+                </div>
+                <div className="mono" style={{ marginTop: 6, textTransform: 'uppercase' }}>
+                  <EditableText
+                    value={m.l}
+                    onCommit={(v) => {
+                      const metrics = (p.metrics || []).slice();
+                      metrics[i] = { ...metrics[i], l: v };
+                      store.updateProject(p.code, { metrics });
+                    }}
+                    placeholder="label"
+                  />
+                </div>
+                {canEdit && (
+                  <button
+                    className="ov-metric-del"
+                    title="Remove metric"
+                    onClick={() => {
+                      const metrics = (p.metrics || []).slice();
+                      metrics.splice(i, 1);
+                      store.updateProject(p.code, { metrics });
+                    }}
+                  >×</button>
+                )}
               </div>
             ))}
           </div>
+          {canEdit && (
+            <button
+              className="btn ghost"
+              style={{ marginTop: 14 }}
+              onClick={() => {
+                const metrics = [...(p.metrics || []), { k: '0', l: 'new metric' }];
+                store.updateProject(p.code, { metrics });
+              }}
+            >+ Add metric</button>
+          )}
         </div>
 
         {((p.subprojects && p.subprojects.length > 0) || canEdit) && (

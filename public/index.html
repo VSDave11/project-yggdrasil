@@ -1069,6 +1069,32 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   color: var(--danger);
 }
 
+/* overlay metric cards */
+.ov-metric { position: relative; }
+.ov-metric-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ov-metric:hover .ov-metric-del { opacity: 1; }
+.ov-metric-del:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 /* btn variants */
 .btn.ghost {
   background: transparent;
