@@ -2,8 +2,8 @@
 const { useState: __useState, useEffect: __useEffect, useRef: __useRef } = React;
 
 function useCanEdit() {
-  // Auth is deferred — everyone can edit until Google OAuth is wired up.
-  return true;
+  // View-only: edits are done via the repo for now.
+  return false;
 }
 
 // Simple text (single line)

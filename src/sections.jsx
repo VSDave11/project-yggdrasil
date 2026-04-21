@@ -96,7 +96,7 @@ function Architecture() {
 function Projects({ fillers, density, onPick }) {
   const store = window.YGG_STORE.useStore();
   const projects = store.projects;
-  const canEdit = true; // auth deferred
+  const canEdit = false; // view-only — edits via repo
 
   const shown = [...projects];
   const fillerCount = Math.max(0, density - projects.length);
@@ -144,7 +144,7 @@ function Projects({ fillers, density, onPick }) {
 
 function ProjectCard({ p, onClick, store }) {
   const { EditableText, EditableStatus } = window.YGG_EDIT;
-  const canEdit = true; // auth deferred
+  const canEdit = false; // view-only — edits via repo
   const progress = window.YGG_STORE.deriveProgress(p);
 
   return (

@@ -27,7 +27,7 @@ function Overlay({ projectCode, onClose }) {
 
   if (!project) return null;
 
-  const canEdit = true; // auth deferred
+  const canEdit = false; // view-only — edits via repo
   const { EditableText, EditableTextarea, EditableStatus, EditableProgress } = window.YGG_EDIT;
   const p = project;
 
@@ -292,29 +292,6 @@ function Overlay({ projectCode, onClose }) {
           </div>
         )}
 
-        <div className="ov-sect" style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--rule)', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {canEdit ? (
-            confirmDel ? (
-              <>
-                <span style={{ color: 'var(--danger)', fontSize: 13 }}>Delete this branch permanently?</span>
-                <button className="btn danger" onClick={() => { store.deleteProject(p.code); onClose(); }}>Yes, delete</button>
-                <button className="btn" onClick={() => setConfirmDel(false)}>Cancel</button>
-              </>
-            ) : (
-              <>
-                <span className="mono" style={{ color: 'var(--ink-dim)', fontSize: 11 }}>
-                  Click any field above to edit · changes auto-save
-                </span>
-                <div style={{ flex: 1 }}/>
-                <button className="btn danger ghost" onClick={() => setConfirmDel(true)}>Delete branch</button>
-              </>
-            )
-          ) : (
-            <span className="mono" style={{ color: 'var(--ink-dim)', fontSize: 11 }}>
-              Sign in to edit this branch.
-            </span>
-          )}
-        </div>
       </aside>
     </div>
   );

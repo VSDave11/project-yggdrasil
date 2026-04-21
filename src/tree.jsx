@@ -111,29 +111,31 @@ function YggTree({ projects, fillers, density, onPick, onCreate }) {
         <animate attributeName="r" values="160;200;160" dur="6s" repeatCount="indefinite" />
       </circle>
 
-      {/* ── PHANTOM BRANCHES (floating ?) ── */}
-      <g className="phantom-layer" opacity={mounted ? 1 : 0} style={{ transition: "opacity 1.4s ease 0.8s" }}>
-        {phantomPaths.map((ph, i) => (
-          <g key={`ph-${i}`} className="phantom-wrap" style={{ '--i': i }}>
-            <path
-              d={ph.d}
-              className="phantom-branch"
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="0.7"
-              strokeLinecap="round"
-              strokeDasharray="2 5"
-            />
-            <g className="phantom" onClick={handleCreate}
-               role="button" tabIndex={0}
-               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleCreate(e)}>
-              <circle cx={ph.px} cy={ph.py} r="11" className="phantom-halo" fill="var(--accent)" />
-              <circle cx={ph.px} cy={ph.py} r="9"  className="phantom-circle" />
-              <text x={ph.px} y={ph.py + 3.2} textAnchor="middle" className="phantom-q">?</text>
+      {/* ── PHANTOM BRANCHES (floating ?) — only shown when creation is enabled ── */}
+      {typeof onCreate === 'function' && (
+        <g className="phantom-layer" opacity={mounted ? 1 : 0} style={{ transition: "opacity 1.4s ease 0.8s" }}>
+          {phantomPaths.map((ph, i) => (
+            <g key={`ph-${i}`} className="phantom-wrap" style={{ '--i': i }}>
+              <path
+                d={ph.d}
+                className="phantom-branch"
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="0.7"
+                strokeLinecap="round"
+                strokeDasharray="2 5"
+              />
+              <g className="phantom" onClick={handleCreate}
+                 role="button" tabIndex={0}
+                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleCreate(e)}>
+                <circle cx={ph.px} cy={ph.py} r="11" className="phantom-halo" fill="var(--accent)" />
+                <circle cx={ph.px} cy={ph.py} r="9"  className="phantom-circle" />
+                <text x={ph.px} y={ph.py + 3.2} textAnchor="middle" className="phantom-q">?</text>
+              </g>
             </g>
-          </g>
-        ))}
-      </g>
+          ))}
+        </g>
+      )}
 
       {/* roots (decorative) */}
       <g stroke="var(--rule)" strokeWidth="0.8" fill="none">
