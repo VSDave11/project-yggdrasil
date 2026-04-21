@@ -6,7 +6,7 @@ function Hero({ fillers, density, onPick, onCreate }) {
   return (
     <section id="top" className="hero">
       <div className="hero-copy">
-        <div className="eyebrow">Projekt · Esims · Oddin.gg · AI & Automation core</div>
+        <div className="eyebrow">Project · Esims · Oddin.gg · AI & Automation core</div>
         <h1 className="hero-title">
           Yggdra<span className="slash">/</span>sil
         </h1>
@@ -108,8 +108,6 @@ function AppInner() {
       <Activity />
       <hr className="rule" />
       <Team />
-      <hr className="rule" />
-      <CTA />
       <footer className="footer">
         <div>© Esims · Oddin.gg · Project Yggdrasil</div>
         <div>Internal · Team only</div>

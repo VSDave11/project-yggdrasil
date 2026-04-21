@@ -347,25 +347,4 @@ function Team() {
   );
 }
 
-// --- CTA ---
-function CTA() {
-  return (
-    <section id="cta" className="cta">
-      <div className="eyebrow" style={{ justifyContent: 'center', marginBottom: 28 }}>§ 07 · Graft a branch</div>
-      <h2 className="h-display">
-        Got a problem<br/>
-        <em>worth a branch?</em>
-      </h2>
-      <p className="lede" style={{ margin: '32px auto 0', textAlign: 'center' }}>
-        If a slice of your team's work looks like it belongs on the tree, the AI Core team wants to hear about it.
-      </p>
-      <div className="cta-row">
-        <a className="btn primary" href="#">Request an intake <span className="a">→</span></a>
-        <a className="btn" href="#">Read the core docs</a>
-        <a className="btn" href="#">Subscribe to changelog</a>
-      </div>
-    </section>
-  );
-}
-
-Object.assign(window, { Manifesto, Architecture, Projects, Timeline, Team, Activity, CTA });
+Object.assign(window, { Manifesto, Architecture, Projects, Timeline, Team, Activity });

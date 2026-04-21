@@ -33,7 +33,7 @@ function AuthModal({ open, onClose }) {
   return (
     <div className="auth-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="auth-card">
-        <div className="auth-eyebrow">Projekt Yggdrasil · sign in</div>
+        <div className="auth-eyebrow">Project Yggdrasil · sign in</div>
         <h3 className="auth-title">Welcome <em>in.</em></h3>
         <p className="auth-sub">
           Editing is reserved for <span style={{ color: 'var(--accent)' }}>@oddin.gg</span> Workspace accounts.
