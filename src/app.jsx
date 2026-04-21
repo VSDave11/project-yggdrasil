@@ -111,7 +111,7 @@ function AppInner() {
       <hr className="rule" />
       <CTA />
       <footer className="footer">
-        <div>© Esims · Oddin.gg · Projekt Yggdrasil</div>
+        <div>© Esims · Oddin.gg · Project Yggdrasil</div>
         <div>Internal · Team only</div>
         <div>Apr 2026</div>
       </footer>
